@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# OMS Variables
+OMSKEY="g0cWwon4UAZ5TCstmMCMFrEUktFYEEn9eyWxIvc1cVgHaTmqZ/jTg/z9maD8p+Z6q2cmKIpOwosjJs03orT1xA=="
+OMSWS="29ccc02d-734a-44ac-a4ae-23150624470e"
+
+# DSC Variables
+DSCKEY="ebtL1h/f5/vGW+GmCqnmRyOsrkWVJOitVPZs2vNaowWztAjm6AwzggUJViYuUl5tLeAJFoQfmABMyMKaEMshIQ=="
+DSCURL="https://eus-agentservice-prod-1.azure-automation.net/accounts/9945772f-1f20-4da6-8cb6-164153635390"
+
+###########################################
+# Download and install OMS
+###########################################
+wget https://github.com/Microsoft/OMS-Agent-for-Linux/releases/download/v1.1.0-28/omsagent-1.1.0-28.universal.x64.sh
+sha256sum ./omsagent-1.1.0-28.universal.x64.sh
+
+chmod 755 ./omsagent-1.1.0-28.universal.x64.sh
+./omsagent-1.1.0-28.universal.x64.sh --upgrade -w $OMSWS -s $OMSKEY
+
+###########################################
+# Download and install DSC
+###########################################
+wget https://github.com/Microsoft/PowerShell-DSC-for-Linux/releases/download/v1.1.1-70/dsc-1.1.1.packages.tar.gz
+chmod 755 dsc-1.1.1.packages.tar.gz
+
+mkdir DSC
+tar -xvf dsc-1.1.1.packages.tar.gz -C DSC
+chmod 755 DSC -R
+
+dpkg -i ./DSC/dsc-1.1.1-70.ssl_100.x64.deb
+
+/opt/microsoft/dsc/Scripts/Register.py $DSCKEY $DSCURL
