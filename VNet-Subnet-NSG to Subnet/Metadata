@@ -1,0 +1,10 @@
+Key Implementation points:-
+Key Implementation pointsARM templates must be used for provisioning Azure resources
+Ansible & Powershell DSC must be used for configuration management. E.g creation of users, 
+Provision VNET with 3 different Subnets
+Each subnet must be associated with it’s own NSG
+In Jump Subnet(SN) NSG, Allow RDP from Internet to jump servers
+In AD SN, no internet should be allowed and all AD servers should only be in Private SN. Connection to AD servers should only be allowed via Jump servers.
+Users connecting to jump servers/AD servers should only be able to connect using their domain credentials.
+AD DS should be synced to Azure AD via Azure AD Connect.
+‘Tools subnet’ is for deploying a 3rd party tool. Tool, assigned to you, must be installed into this subnet and must be made available using a custom domain.
