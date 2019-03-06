@@ -1,0 +1,210 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vnetName": {
+       "type": "string",
+       "defaultValue": "VNet",
+       "metadata": {
+       "description": "VNet Name"
+	}
+   },
+   "vnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "192.168.0.0/16",
+      "metadata": {
+      "description": "Address Prefix"
+	}
+    },
+    "subnet1Prefix": {
+      "type": "string",
+      "defaultValue": "192.168.1.0/24",
+      "metadata": {
+        "description": "Subnet 1 Prefix"
+      }
+    },
+    "subnet1Name": {
+      "type": "string",
+      "defaultValue": "JumpServer",
+      "metadata": {
+        "description": "Subnet 1 Name"
+      }
+    },
+    "subnet2Prefix": {
+      "type": "string",
+      "defaultValue": "192.168.2.0/24",
+      "metadata": {
+        "description": "AD Subnet"
+      }
+    },
+    "subnet2Name": {
+      "type": "string",
+      "defaultValue": "ADSubnet",
+      "metadata": {
+        "description": "AD Subnet"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    },
+    "JumpServerNSGName": {
+      "type": "string",
+      "defaultValue": "JumpServerNSG",
+      "metadata": {
+        "description": "NSG for Jump Servers."
+      }
+    },
+    "ADServerNSGName": {
+      "type": "string",
+      "defaultValue": "ADNSG",
+      "metadata": {
+        "description": "NSG for AD Subnet."
+      }
+    }
+  },
+  "resources": [
+        {
+          "apiVersion": "2015-05-01-preview",
+          "type": "Microsoft.Network/networkSecurityGroups",
+          "name": "[parameters('JumpServerNSGName')]",
+          "location": "[parameters('location')]",
+          "properties": {
+          "securityRules": [
+           {
+            "name": "RDP_Rule",
+              "properties": {
+                "description": "Allow RDP",
+                "protocol": "Tcp",
+                "sourcePortRange": "*",
+                "destinationPortRange": "3389",
+                "sourceAddressPrefix": "Internet",
+                "destinationAddressPrefix": "*",
+                "access": "Allow",
+                "priority": 100,
+                "direction": "Inbound"
+               }
+            },
+            {
+             "name": "Web_Rule",
+             "properties": {
+              	"description": "Allow WEB",
+              	"protocol": "Tcp",
+              	"sourcePortRange": "*",
+              	"destinationPortRange": "80",
+              	"sourceAddressPrefix": "Internet",
+              	"destinationAddressPrefix": "*",
+              	"access": "Allow",
+              	"priority": 101,
+              	"direction": "Inbound"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "apiVersion": "2015-05-01-preview",
+        "type": "Microsoft.Network/networkSecurityGroups",
+        "name": "[parameters('ADServerNSGName')]",
+        "location": "[parameters('location')]",
+        "properties": {
+          "securityRules": [
+          {
+           "name": "Allow_JumpServer",
+           "properties": {
+             "description": "Allow JumpSever Subnet",
+             "protocol": "Tcp",
+             "sourcePortRange": "*",
+             "destinationPortRange": "3389",
+             "sourceAddressPrefix": "[parameters('subnet1Prefix')]",
+             "destinationAddressPrefix": "*",
+             "access": "Allow",
+             "priority": 100,
+             "direction": "Inbound"
+            }
+          },
+          {
+           "name": "Block_Internet_Inbound",
+           "properties": {
+             "description": "Block Internet",
+             "protocol": "Tcp",
+             "sourcePortRange": "*",
+             "destinationPortRange": "*",
+             "sourceAddressPrefix": "Internet",
+             "destinationAddressPrefix": "*",
+             "access": "Deny",
+             "priority": 101,
+             "direction": "Inbound"
+           }
+          },
+          { 
+           "name": "Block_Internet_Outbound",
+           "properties": {
+             "description": "Block Internet",
+             "protocol": "*",
+             "sourcePortRange": "*",
+             "destinationPortRange": "*",
+             "sourceAddressPrefix": "*",
+             "destinationAddressPrefix": "Internet",
+             "access": "Deny",
+             "priority": 200,
+             "direction": "Outbound"
+            }
+          }
+        ]
+       } 
+      },
+      { 
+      "apiVersion": "2018-10-01",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[parameters('vnetName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('JumpServerNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('ADServerNSGName'))]",
+      ],
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vnetAddressPrefix')]"
+            ]
+          }
+       },
+      "resources": [
+       {
+        "apiVersion": "2018-10-01",
+        "type": "subnets",
+        "location": "[parameters('location')]",
+        "name": "[parameters('subnet1Name')]",
+        "dependsOn": [
+            "[parameters('vnetName')]"
+          ],
+         "properties": {
+            "addressPrefix": "[parameters('subnet1Prefix')]",
+            "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('JumpServerNSGName'))]"
+             }
+          }
+        },
+        {
+          "apiVersion": "2018-10-01",
+          "type": "subnets",
+          "location": "[parameters('location')]",
+          "name": "[parameters('subnet2Name')]",
+          "dependsOn": [
+            "[parameters('vnetName')]"
+          ],
+          "properties": {
+            "addressPrefix": "[parameters('subnet2Prefix')]",
+            "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('ADServerNSGName'))]"
+              }
+          }
+        }
+     ]
+    }
+  ]
+}
