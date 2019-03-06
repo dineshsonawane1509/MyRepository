@@ -1,0 +1,246 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "VNetName": {
+      "type": "string",
+      "defaultValue": "VNet",
+      "metadata": {
+        "description": "Virtual Network"
+      }
+    },
+    "addressPrefix": {
+      "type": "string",
+      "defaultValue": "192.168.0.0/16",
+      "metadata": {
+        "description": "Address Space for Virtual Network"
+      }
+    },
+    "JumpBoxSubnetPrefix": {
+      "type": "string",
+      "defaultValue": "192.168.1.0/24",
+      "metadata": {
+        "description": "This is CIDR prefix for Jump Box Subnet"
+      }
+    },
+    "ADSubetPrefix": {
+      "type": "string",
+      "defaultValue": "192.168.2.0/24",
+      "metadata": {
+        "description": "This is CIDR prefix for AD Subnet"
+      }
+    },
+    "DevOpsToolSubnetPrefix": {
+      "type": "string",
+      "defaultValue": "192.168.3.0/24",
+      "metadata": {
+        "description": "This is CIDR prefix for DevOps Tool Subnet"
+      }
+    },
+    "JumpBoxNSGName": {
+      "type": "string",
+      "defaultValue": "JumpBoxNSG",
+      "metadata": {
+        "description": "This is name of the Network Security Group that will be assigned to Jumb Box Subnet"
+      }
+    },
+    "ADSubetNSGName": {
+      "type": "string",
+      "defaultValue": "ADNSG",
+      "metadata": {
+        "description": "This is name of the networkSecurityGroup that will be assigned to AD Subnet"
+      }
+    },
+    "DevOpsToolSubnetNSGName": {
+      "type": "string",
+      "defaultValue": "DevOpsToolNSG",
+      "metadata": {
+        "description": "This is name of the networkSecurityGroup that will be assigned to DevOps Tool Subnet"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    }
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('JumpBoxNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+           {
+           "name": "RDP_Rule",
+           "properties": {
+             "description": "Allow RDP",
+             "protocol": "Tcp",
+             "sourcePortRange": "*",
+             "destinationPortRange": "3389",
+             "sourceAddressPrefix": "Internet",
+             "destinationAddressPrefix": "*",
+             "access": "Allow",
+             "priority": 100,
+             "direction": "Inbound"
+            }
+          },
+         {
+           "name": "web_rule",
+           "properties": {
+             "description": "Allow WEB",
+             "protocol": "Tcp",
+             "sourcePortRange": "*",
+             "destinationPortRange": "80",
+             "sourceAddressPrefix": "Internet",
+             "destinationAddressPrefix": "*",
+             "access": "Allow",
+             "priority": 101,
+             "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('ADSubetNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_RDP_From_JumpBox",
+            "properties": {
+              "description": "Allow JumpBox Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('JumpBoxSubnetPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+           "name": "Block_Internet_Inbound",
+           "properties": {
+             "description": "Block Internet",
+             "protocol": "Tcp",
+             "sourcePortRange": "*",
+             "destinationPortRange": "*",
+             "sourceAddressPrefix": "Internet",
+             "destinationAddressPrefix": "*",
+             "access": "Deny",
+             "priority": 101,
+             "direction": "Inbound"
+           }
+         },
+         {
+           "name": "Block_Internet_Outbound",
+           "properties": {
+             "description": "Block Internet",
+             "protocol": "*",
+             "sourcePortRange": "*",
+             "destinationPortRange": "*",
+             "sourceAddressPrefix": "*",
+             "destinationAddressPrefix": "Internet",
+             "access": "Deny",
+             "priority": 200,
+             "direction": "Outbound"
+           }
+         }
+       ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('DevOpsToolSubnetNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_AD_Subnet",
+           "properties": {
+             "description": "Allow ADS Subnet",
+             "protocol": "Tcp",
+             "sourcePortRange": "*",
+             "destinationPortRange": "*",
+             "sourceAddressPrefix": "[parameters('ADSubetPrefix')]",
+             "destinationAddressPrefix": "*",
+             "access": "Allow",
+             "priority": 100,
+             "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_JumbBox",
+            "properties": {
+              "description": "Block Jump Box Subnet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "[parameters('JumpBoxSubnetPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[parameters('VNetName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('JumpBoxNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('ADSubetNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('DevOpsToolSubnetNSGName'))]"
+      ],
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('addressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "JubBoxSubnet",
+            "properties": {
+              "addressPrefix": "[parameters('JumpBoxSubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('JumpBoxNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "ADSubnet",
+            "properties": {
+              "addressPrefix": "[parameters('ADSubetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('ADSubetNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "DevOpsToolSubnet",
+            "properties": {
+              "addressPrefix": "[parameters('DevOpsToolSubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('DevOpsToolSubnetNSGName'))]"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
