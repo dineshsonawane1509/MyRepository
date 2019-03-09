@@ -1,0 +1,8 @@
+This ARM Template (With Linked Nesting for another Template) create VNet with 3 Subnest with NSG attached to it.
+also creat one VM in first subnet with another template(Nested Template) called from Main Template(Parent Template).
+
+Before running this template upload VM template(VMDeployment.json) to Storage Account or Bithub (In this temlate I used Azure Storage Account),
+and change path of uploaded VM tempate(VMDeployment.json) in main template(templateVnet).
+
+Powershell Script:- New-AzureRmResourceGroupDeployment -TemplateFile "C:\Dinesh S\ARM Templates\Nested_VNet_VM\templateVnet.txt" 
+-TemplateParameterFile "C:\Dinesh S\ARM Templates\Nested_VNet_VM\parameterVnet.txt"
