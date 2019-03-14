@@ -1,0 +1,607 @@
+Configuration DomainControllers
+
+{
+
+param
+
+(
+
+[Parameter(Mandatory = $true)][PSCredential]$SafeModeCredentials,
+
+[Parameter(Mandatory = $true)][PSCredential]$VMCredentials,
+
+[Parameter(Mandatory = $true)][PSCredential]$DomainAdministratorCredentials,
+
+[Parameter(Mandatory = $true)][string]$AdministratorAccount,
+
+[Parameter(Mandatory = $true)][string]$FirstDomainControllerName,
+
+[Parameter(Mandatory = $true)][string]$FirstDomainControllerIPAddress,
+[Parameter(Mandatory = $true)][string]$FirstDomainControllerName,
+
+[Parameter(Mandatory = $true)][string]$SecondDomainControllerIPAddress,
+
+[Parameter(Mandatory = $true)][string]$GatewayAddress,
+
+[Parameter(Mandatory = $true)][string]$SubnetMask,
+
+[Parameter(Mandatory = $true)][string]$DomainName,
+
+[Parameter(Mandatory = $true)][string]$DomainDnsName
+
+)
+Import-Module PSDesiredStateConfiguration
+
+Import-Module xActiveDirectory
+ 
+
+Import-DscResource -ModuleName PSDesiredStateConfiguration
+
+Import-DscResource -ModuleName xActiveDirectory
+ 
+
+Node $FirstDomainControllerName
+
+{
+
+File ADFiles
+
+{
+
+DestinationPath = 'C:\NTDS'
+
+Type = 'Directory'
+
+Ensure = 'Present'
+
+}
+ 
+
+WindowsFeature DNS
+
+{
+
+Ensure = "Present"
+
+Name = "DNS"
+
+}
+
+
+
+
+xIPAddress SetIP
+{
+
+IPAddress = $FirstDomainControllerIPAddress
+
+InterfaceAlias = 'Ethernet'
+
+DefaultGateway = $GatewayAddress
+
+SubnetMask = $SubnetMask
+
+AddressFamily = 'IPv4'
+
+}
+
+
+
+
+xDnsServerAddress DnsServerAddress
+
+{
+Address        = '127.0.0.1'
+
+InterfaceAlias = 'Ethernet'
+
+AddressFamily  = 'IPv4'
+
+DependsOn = "[WindowsFeature]DNS"
+
+}
+
+WindowsFeature AD-Domain-Services
+
+{
+
+Ensure = "Present"
+
+Name = "AD-Domain-Services"
+
+DependsOn = "[File]ADFiles"
+
+}
+
+
+
+
+# These RSAT features are optional, but you may want
+
+#  the admin tools installed locally.
+
+WindowsFeature RSAT-DNS-Server
+{
+
+Ensure = "Present"
+
+Name = "RSAT-DNS-Server"
+
+DependsOn = "[WindowsFeature]DNS"
+
+}
+
+
+WindowsFeature RSAT-AD-Tools
+
+{
+
+Name = 'RSAT-AD-Tools'
+
+Ensure = 'Present'
+
+DependsOn = "[WindowsFeature]AD-Domain-Services"
+
+}
+
+WindowsFeature RSAT-ADDS
+{
+
+Ensure = "Present"
+
+Name = "RSAT-ADDS"
+
+DependsOn = "[WindowsFeature]AD-Domain-Services"
+
+}
+
+
+
+
+WindowsFeature RSAT-ADDS-Tools
+
+{
+
+Name = 'RSAT-ADDS-Tools'
+
+Ensure = 'Present'
+DependsOn = "[WindowsFeature]RSAT-ADDS"
+
+}
+
+
+
+
+WindowsFeature RSAT-AD-AdminCenter
+
+{
+
+Name = 'RSAT-AD-AdminCenter'
+
+Ensure = 'Present'
+
+DependsOn = "[WindowsFeature]AD-Domain-Services"
+
+}
+ 
+
+# Here’s where we create the domain.
+
+# No slash at end of folder paths.
+xADDomain PrimaryDC
+
+{
+
+DomainName = $DomainDnsName
+
+DomainNetbiosName = $DomainName
+
+DomainAdministratorCredential = $DomainAdministratorCredentials
+
+SafemodeAdministratorPassword = $SafeModeCredentials
+
+DatabasePath = 'C:\NTDS'
+
+LogPath = 'C:\NTDS'
+
+DependsOn = "[WindowsFeature]AD-Domain-Services"
+
+}
+ 
+
+# Here’s where we create the alternate administrator account,
+
+#  and add it to the appropriate groups.
+
+xADUser AlternateAdminUser
+
+{
+
+DomainName = $DomainDnsName
+
+UserName = $AdministratorAccount
+
+Password = $DomainAdministratorCredentials # Uses just the password
+
+DisplayName = $AdministratorAccount
+
+PasswordAuthentication = 'Negotiate'
+
+DomainAdministratorCredential = $DomainAdministratorCredentials
+
+Ensure = 'Present'
+
+DependsOn = "[xADDomain]PrimaryDC"
+
+}
+
+
+
+
+xADGroup AddAdminToDomainAdminsGroup
+
+{
+GroupName = "Domain Admins"
+
+GroupScope = 'Global'
+
+Category = 'Security'
+
+MembersToInclude = @($AdministratorAccount, "Administrator")
+
+Ensure = 'Present'
+
+Credential = $DomainAdministratorCredentials
+
+DependsOn = "[xADUser]AlternateAdminUser"
+
+}
+ 
+
+xADGroup AddAdminToEnterpriseAdminsGroup
+
+{
+
+GroupName = "Enterprise Admins"
+
+GroupScope = 'Universal'
+
+Category = 'Security'
+
+MembersToInclude = @($AdministratorAccount, "Administrator")
+Ensure = 'Present'
+
+Credential = $DomainAdministratorCredentials
+
+DependsOn = "[xADUser]AlternateAdminUser"
+
+}
+
+}
+
+
+
+
+Node $SecondDomainControllerName
+{
+
+<# Using a ScriptBlock so I can do string substitution. Also, I'm using xDnsServerAddress below, for after the domain controller is configured, and you can't use the same configuration resource twice in one DSC config (which one should it use? = error), so a ScriptBlock is necessary to allow this machine to find the PDC and its DNS server. #>
+
+[ScriptBlock]$SetScript =
+
+{
+
+Set-DnsClientServerAddress -InterfaceAlias Ethernet -ServerAddresses ("$FirstDomainControllerIPAddress")
+
+}
+Script SetDnsServerAddressToFindPDC
+
+{
+
+GetScript = {return @{}}
+
+TestScript = {return $false} # Always run the SetScript for this.
+
+SetScript = $SetScript.ToString().Replace('$FirstDomainControllerIPAddress', $FirstDomainControllerIPAddress)
+
+}
+ 
+
+File ADFiles
+
+{
+DestinationPath = 'C:\NTDS'
+
+Type = 'Directory'
+
+Ensure = 'Present'
+
+}
+
+
+
+
+WindowsFeature DNS
+
+{
+
+Ensure = "Present"
+
+Name = "DNS"
+
+DependsOn = "[File]ADFiles"
+
+}
+ 
+
+WindowsFeature AD-Domain-Services
+
+{
+
+Ensure = "Present"
+
+Name = "AD-Domain-Services"
+
+DependsOn = "[WindowsFeature]DNS"
+
+}
+ 
+
+xIPAddress SetIP
+
+{
+
+IPAddress = $SecondDomainControllerIPAddress
+
+InterfaceAlias = 'Ethernet'
+
+DefaultGateway = $GatewayAddress
+
+SubnetMask = $SubnetMask
+
+AddressFamily = 'IPv4'
+
+}
+ 
+
+# RSAT tools are optional, but you may want them installed locally.
+
+WindowsFeature DnsTools
+
+{
+
+Ensure = "Present"
+
+Name = "RSAT-DNS-Server"
+
+DependsOn = "[WindowsFeature]DNS"
+
+}
+
+
+
+
+WindowsFeature RSAT-AD-Tools
+
+{
+
+Name = 'RSAT-AD-Tools'
+
+Ensure = 'Present'
+
+DependsOn = "[WindowsFeature]AD-Domain-Services"
+
+}
+ 
+
+WindowsFeature RSAT-ADDS
+
+{
+
+Ensure = "Present"
+
+Name = "RSAT-ADDS"
+
+DependsOn = "[WindowsFeature]AD-Domain-Services"
+
+}
+ 
+
+WindowsFeature RSAT-ADDS-Tools
+
+{
+
+Name = 'RSAT-ADDS-Tools'
+
+Ensure = 'Present'
+
+DependsOn = "[WindowsFeature]RSAT-ADDS"
+
+}
+WindowsFeature RSAT-AD-AdminCenter
+
+{
+
+Name = 'RSAT-AD-AdminCenter'
+
+Ensure = 'Present'
+
+DependsOn = "[WindowsFeature]AD-Domain-Services"
+
+}
+ 
+
+# Wait for the first domain controller to be set up before we continue.
+
+xWaitForADDomain WaitForPrimaryDC
+
+{
+
+DomainName = $DomainName
+
+DomainUserCredential = $DomainAdministratorCredentials
+
+RetryCount = 600
+
+RetryIntervalSec = 30
+
+RebootRetryCount = 10
+
+DependsOn = @("[Script]SetDnsServerAddressToFindPDC")
+
+}
+# Join this computer to the domain; this should cause a reboot.
+
+# Note that we depend on the previous task to wait for the domain.
+
+xComputer JoinDomain
+
+{
+
+Name = ($DCPrefix + $i.ToString().PadLeft(2, '0'))
+
+DomainName = $DomainDnsName
+
+Credential = $DomainAdministratorCredentials
+
+DependsOn = "[xWaitForADDomain]WaitForPrimaryDC"
+
+}
+ 
+
+# Add this computer as a domain controller
+
+xADDomainController SecondaryDC
+
+{
+
+DomainName = $DomainDnsName
+
+DomainAdministratorCredential = $DomainAdministratorCredentials
+
+SafemodeAdministratorPassword = $SafeModeCredentials
+
+DatabasePath = 'C:\NTDS'
+
+LogPath = 'C:\NTDS'
+
+DependsOn = @("[WindowsFeature]AD-Domain-Services","[xComputer]JoinDomain")
+
+}
+ 
+
+# Now make sure this computer uses itself as a DNS source
+
+xDnsServerAddress DnsServerAddress
+
+{
+
+Address        = @('127.0.0.1', $FirstDomainControllerIPAddress)
+
+InterfaceAlias = 'Ethernet'
+
+AddressFamily  = 'IPv4'
+
+DependsOn = "[xADDomainController]SecondaryDC"
+
+}
+xDnsServerAddress DnsServerAddressv6
+
+{
+
+Address        = '::1'
+
+InterfaceAlias = 'Ethernet'
+
+AddressFamily  = 'IPv6'
+
+DependsOn = "[xADDomainController]SecondaryDC"
+
+}
+
+}
+
+}
+</code block>
+
+Compiling and running the configuration
+Now that the configuration exists, we need to compile it using the specific values we need. After that, we’ll push the configuration to the nodes.
+
+<code block>
+
+# Here’s where we name the servers and the domain.
+
+$FirstDomainControllerName = ‘DC01’
+
+$FirstDomainControllerIPAddress = ‘www.xxx.yyy.zzz’
+
+$SecondDomainControllerName = ‘DC02’
+
+$SecondDomainControllerIPAddress = ‘www.xxx.yyy.zzz’
+
+
+$GatewayAddress = ‘www.xxx.yyy.zzz’
+
+$SubnetMask = 16 # Or 8, or 24, etc.
+
+
+$DomainName = ‘MYAWESOMEDOMAIN’
+
+$DomainDnsName = ‘myawesomedomain.com’
+ 
+
+# We’ll disable the Administrator account; this is the name of the account that will become the new administrator.
+
+$AdministratorAccount = ‘ADifferentUsernameThanAdministrator’
+ 
+
+$VMCredentials = Get-Credential -Message "Enter the local administrator credentials." -UserName $AdministratorAccount
+
+
+# This is where we’ll type in the password of the new administrator account.
+
+$DomainAdministratorCredentials = Get-Credential -Message "Enter the domain administrator credentials." -UserName ($DomainName + ‘\’ + $AdministratorAccount)
+
+
+# This is used just to type in the safe mode password; the username isn’t used.
+
+$SafeModeCredentials = Get-Credential -Message "Enter the new domain's Safe Mode administrator password." -UserName '(Password Only)'
+
+DomainControllers -SafeModeCredentials $SafeModeCredentials `
+
+-VMCredentials $VMCredentials `
+
+-DomainAdministratorCredentials $DomainAdministratorCredentials `
+-FirstDomainControllerName $FirstDomainControllerName `
+
+-FirstDomainControllerIPAddress $FirstDomainControllerIPAddress `
+
+-SecondDomainControllerName $SecondDomainControllerName `
+
+-SecondDomainControllerIPAddress $SecondDomainControllerIPAddress `
+
+-GatewayAddress $GatewayAddress `
+
+-SubnetMask $SubnetMask `
+
+-DomainName $DomainName`
+
+-DomainDnsName $DomainDnsName`
+
+-AdminstratorAccount $AdministratorAccount
+ 
+
+</code block>
+
+And now, let’s push to each node:
+
+<code block>
+
+$VMSession1 = New-CimSession -Credential $VMCredentials -ComputerName $FirstDomainControllerName -Verbose
+
+$VMSession2 = New-CimSession -Credential $VMCredentials -ComputerName $SecondDomainControllerName -Verbose
+
+
+Start-DscConfiguration -Path '.\DomainControllers -CimSession $VMSession1 -Verbose -Wait -Force
+
+Start-DscConfiguration -Path '.\DomainControllers -CimSession $VMSession2 -Verbose -Wait -Force
