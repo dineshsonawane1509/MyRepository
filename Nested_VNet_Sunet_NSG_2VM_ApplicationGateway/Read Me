@@ -1,4 +1,9 @@
-Please find the Nested (Linked) ARM for V-Net with 3 Subnets with NSG attached (Parent Template), 
-Linked 2 VM in 2 different subnets and application gateway in third subnet.
+templateVnet (templatefile) and parameterVnet (parameterfile):- Please find the Nested (Linked) ARM for V-Net with 3 Subnets and NSG attached (Parent Template).
 
-Add Linked Template (VMs and Application Gateway) in Stoarage Account (Container), copy URLs and update in Parent Template (VNet).
+VMDeployment_AD.json and VMDeployment_JS.json:- Nested Linked ARM Templates for Linked 2 VM in first and second subnets.
+ 
+templateAG.json:-  Nested Linked ARM Template for Application Gateway in third subnet.
+
+Add Linked Template (VMs and Application Gateway) in Stoarage Account (Container), copy URLs and update in Parent Template (templateVNet).
+
+Aslo, find the DSC for Domain Contrler and DNS configuration.
