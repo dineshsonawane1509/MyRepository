@@ -7,3 +7,9 @@ templateAG.json:-  Nested Linked ARM Template for Application Gateway in third s
 Add Linked Template (VMs and Application Gateway) in Stoarage Account (Container), copy URLs and update in Parent Template (templateVNet).
 
 Aslo, find the DSC for Domain Contrler and DNS configuration.
+
+
+Note: After creation of Application Gateway, you need to add custom probe that wer created with gateway template.
+      Override Backend Path: "/"
+      Checked On: "App Service"
+      Custome Probe: Select custom probe that we created above with Gateway Template.
