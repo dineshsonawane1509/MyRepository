@@ -1,1 +1,15 @@
 Please find the DSC configuration file for Domain Control (Primary Only) and DNS configuration.
+
+Steps:
+
+1) After assigned configuration to node, will get complient completed message for windoes feture but will get failed massage for xADDomian after some time.
+
+2) Then you need to add domain servers (primary or secondary) in V-Net for Custome Domain Configuration.
+   Note: If only one domai, do it for primary one only.
+
+3) Retsrat Both domain servers (primary or secondary) or Primary.
+ 
+5) After restart check both or one domain server and confirm Domain controler and DNS Servers.
+
+4) Restrat servers that you want to add to add to domain, and try to join domain.
+
