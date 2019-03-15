@@ -159,23 +159,6 @@
             }
           }
         ],
-        "probes": [
-             {
-                 "name": "appGatewayBackendHttpSettings53580268-eae1-459a-9b49-cde848d9d020",
-                 "properties": {
-                 	"provisioningState": "Succeeded",
-                        "protocol": "Http",
-                        "path": "/",
-                        "interval": 30,
-                        "timeout": 30,
-                        "unhealthyThreshold": 3,
-                        "pickHostNameFromBackendHttpSettings": true,
-                        "minServers": 0,
-                        "match": {}
-                      },
-                        "type": "Microsoft.Network/applicationGateways/probes"
-                }
-         ],
         "backendAddressPools": [
           {
             "name": "appGatewayBackendPool",
@@ -194,10 +177,7 @@
             "properties": {
               "Port": 80,
               "Protocol": "Http",
-              "CookieBasedAffinity": "Disabled",
-              "probe": {
-                  "id": "[concat(variables('applicationGatewayID'), '/probes/appGatewayBackendHttpSettings53580268-eae1-459a-9b49-cde848d9d020')]"
-               }
+              "CookieBasedAffinity": "Disabled"
             }
           }
         ],
@@ -233,7 +213,24 @@
             }
           }
         ],
-        "webApplicationFirewallConfiguration": {
+        "probes": [
+             {
+                 "name": "appGatewayBackendHttpSettings53580268-eae1-459a-9b49-cde848d9d020",
+                 "properties": {
+                 	"provisioningState": "Succeeded",
+                        "protocol": "Http",
+                        "path": "/",
+                        "interval": 30,
+                        "timeout": 30,
+                        "unhealthyThreshold": 3,
+                        "pickHostNameFromBackendHttpSettings": true,
+                        "minServers": 0,
+                        "match": {}
+                      },
+                        "type": "Microsoft.Network/applicationGateways/probes"
+                }
+         ],
+         "webApplicationFirewallConfiguration": {
           "enabled": "[parameters('wafEnabled')]",
           "firewallMode": "[parameters('wafMode')]",
           "ruleSetType": "[parameters('wafRuleSetType')]",
