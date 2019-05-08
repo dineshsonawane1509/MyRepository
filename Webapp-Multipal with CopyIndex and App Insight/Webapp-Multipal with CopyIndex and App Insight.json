@@ -88,7 +88,9 @@
             "apiVersion": "2016-03-01",
             "name": "[concat(parameters('webSiteName'), copyIndex(1))]",
             "location": "[parameters('location')]",
-            "dependsOn": ["ServerFarm"],
+            "dependsOn": [
+                "[concat(parameters('hostingPlanName'), copyIndex(1))]"
+            ],
             "tags": {
                 "[concat('hidden-related:', resourceId('Microsoft.Web/serverfarms', parameters('hostingPlanName')))]": "empty",
                 "ENGAGEMENT_ID": "[parameters('EngagementId')]",
@@ -99,14 +101,9 @@
             },
             "properties": {
                 "name": "[concat(parameters('webSiteName'), copyIndex(1))]",
-                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', concat(parameters('hostingPlanName'), copyIndex()))]"
-            },
-            "copy": {
-                "name": "WebSite",
-                "count": "[parameters('webappcount')]"
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', concat(parameters('hostingPlanName'), copyIndex(1)))]"
             },
             "resources": [
-
                 {
                     "type": "config",
                     "apiVersion": "2015-08-01",
@@ -116,18 +113,21 @@
                     ],
                     "properties": {
                         "APPINSIGHTS_INSTRUMENTATIONKEY": "[reference(resourceId('microsoft.insights/components/', concat(parameters('appInsightsName'), copyIndex(1))), '2015-05-01').InstrumentationKey]"
-
                     }
                 }
-            ]
-        },  
+            ],
+            "copy": {
+                "name": "WebSite",
+                "count": "[parameters('webappcount')]"
+            }
+        },
         {
             "type": "Microsoft.Insights/components",
             "apiVersion": "2015-05-01",
             "name": "[concat(parameters('appInsightsName'), copyIndex(1))]",
             "location": "[parameters('location')]",
             "dependsOn": [
-                "WebSite"
+                "[concat(parameters('hostingPlanName'), copyIndex(1))]"
             ],
             "tags": {
                 "[concat('hidden-related:', resourceId('Microsoft.Web/serverfarms', parameters('hostingPlanName')))]": "empty",
