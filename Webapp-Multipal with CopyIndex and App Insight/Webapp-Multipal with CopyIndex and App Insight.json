@@ -1,0 +1,150 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "skuName": {
+            "allowedValues": [
+                "F1",
+                "D1",
+                "B1",
+                "B2",
+                "B3",
+                "S1",
+                "S2",
+                "S3",
+                "P1",
+                "P2",
+                "P3",
+                "P4"
+            ],
+            "type": "String",
+            "metadata": {
+                "description": "Describes plan's pricing tier and instance size. Check details at https://azure.microsoft.com/en-us/pricing/details/app-service/"
+            }
+        },
+        "skuCapacity": {
+            "minValue": 1,
+            "type": "Int",
+            "metadata": {
+                "description": "Describes plan's instance count"
+            }
+        },
+        "DeploymentID": {
+            "type": "String"
+        },
+        "EngagementId": {
+            "type": "String"
+        },
+        "Owner": {
+            "type": "String"
+        },
+        "webappcount": {
+            "type": "Int"
+        },
+        "Owner2": {
+            "type": "String"
+        },
+        "hostingPlanName": {
+            "type": "String"
+        },
+        "websiteName": {
+            "type": "String"
+        },
+        "location": {
+            "type": "String"
+        },
+        "appInsightsName": {
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2016-03-01",
+            "name": "[concat(parameters('hostingPlanName'), copyIndex(1))]",
+            "location": "[parameters('location')]",
+            "tags": {
+                "ENGAGEMENT_ID": "[parameters('EngagementId')]",
+                "Owner": "[parameters('Owner')]",
+                "Owner2": "[parameters('Owner2')]",
+                "DEPLOYMENT_ID": "[parameters('DeploymentID')]",
+                "ROLE_PURPOSE": "App Service Plan"
+            },
+            "sku": {
+                "name": "[parameters('skuName')]",
+                "capacity": "[parameters('skuCapacity')]"
+            },
+            "properties": {
+                "name": "[concat(parameters('hostingPlanName'), copyIndex(1))]"
+            },
+            "copy": {
+                "name": "ServerFarm",
+                "count": "[parameters('webappcount')]"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2016-03-01",
+            "name": "[concat(parameters('webSiteName'), copyIndex(1))]",
+            "location": "[parameters('location')]",
+            "dependsOn": ["ServerFarm"],
+            "tags": {
+                "[concat('hidden-related:', resourceId('Microsoft.Web/serverfarms', parameters('hostingPlanName')))]": "empty",
+                "ENGAGEMENT_ID": "[parameters('EngagementId')]",
+                "OWNER": "[parameters('Owner')]",
+                "Owner2": "[parameters('Owner2')]",
+                "DEPLOYMENT_ID": "[parameters('DeploymentID')]",
+                "ROLE_PURPOSE": "App Service"
+            },
+            "properties": {
+                "name": "[concat(parameters('webSiteName'), copyIndex(1))]",
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', concat(parameters('hostingPlanName'), copyIndex()))]"
+            },
+            "copy": {
+                "name": "WebSite",
+                "count": "[parameters('webappcount')]"
+            },
+            "resources": [
+
+                {
+                    "type": "config",
+                    "apiVersion": "2015-08-01",
+                    "name": "appsettings",
+                    "dependsOn": [
+                        "[concat(parameters('webSiteName'), copyIndex(1))]"
+                    ],
+                    "properties": {
+                        "APPINSIGHTS_INSTRUMENTATIONKEY": "[reference(resourceId('microsoft.insights/components/', concat(parameters('appInsightsName'), copyIndex(1))), '2015-05-01').InstrumentationKey]"
+
+                    }
+                }
+            ]
+        },  
+        {
+            "type": "Microsoft.Insights/components",
+            "apiVersion": "2015-05-01",
+            "name": "[concat(parameters('appInsightsName'), copyIndex(1))]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "WebSite"
+            ],
+            "tags": {
+                "[concat('hidden-related:', resourceId('Microsoft.Web/serverfarms', parameters('hostingPlanName')))]": "empty",
+                "ENGAGEMENT_ID": "[parameters('EngagementId')]",
+                "OWNER": "[parameters('Owner')]",
+                "Owner2": "[parameters('Owner2')]",
+                "DEPLOYMENT_ID": "[parameters('DeploymentID')]",
+                "ROLE_PURPOSE": "Application Insights"
+            },
+            "properties": {
+                "ApplicationId": "[concat(parameters('webSiteName'), copyIndex(1))]"
+            },
+            "copy": {
+                "name": "Insight",
+                "count": "[parameters('webappcount')]"
+            }
+        }
+    ],
+    "outputs": {}
+}
